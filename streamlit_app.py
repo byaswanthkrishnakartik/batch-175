@@ -36,11 +36,7 @@ def seed_data(conn):
         data = []
         for i in range(30):
             eid = f"EQUIP{str(i+1).zfill(4)}"
-            etype = np.random.choice([
-                'X-ray', 'MRI', 'CT Scan', 'Ultrasound', 'Ventilator', 
-                'ECG machine', 'EEG machine', 'EMG machine', 
-                'Blood Gas Analyzers', 'Defibrillators', 'Hospital Beds'
-            ])
+            etype = np.random.choice(['X-ray', 'MRI', 'CT Scan', 'Ultrasound', 'Ventilator'])
             last = datetime.now() - timedelta(days=np.random.randint(30, 180))
             next_ = last + timedelta(days=np.random.randint(30, 90))
             status = np.random.choice(['Operational', 'Under Maintenance', 'Faulty'])
@@ -99,42 +95,16 @@ data = load_data(conn)
 st.subheader("🔍 Equipment Inventory")
 st.dataframe(data[['id', 'type', 'Last Maintenance Date', 'Next Maintenance Date', 'status']])
 
-# Animated Visualizations
-st.subheader("📊 Equipment Status Distribution (Animated)")
-placeholder1 = st.empty()
+# Visualizations
+st.subheader("📊 Equipment Status Distribution")
+fig1, ax1 = plt.subplots()
+sns.countplot(data=data, x='status', palette='viridis', ax=ax1)
+st.pyplot(fig1)
 
-status_counts = data['status'].value_counts()
-max_count = status_counts.max()
-
-for i in range(1, max_count + 1):
-    fig1, ax1 = plt.subplots()
-    sns.barplot(
-        x=status_counts.index, 
-        y=[min(count, i) for count in status_counts.values], 
-        palette='viridis', 
-        ax=ax1
-    )
-    ax1.set_ylim(0, max_count + 5)
-    placeholder1.pyplot(fig1)
-    time.sleep(0.2)
-
-st.subheader("⚠️ Maintenance Urgency Levels (Animated)")
-placeholder2 = st.empty()
-
-urgency_counts = data['Maintenance Urgency'].value_counts()
-max_urgency = urgency_counts.max()
-
-for i in range(1, max_urgency + 1):
-    fig2, ax2 = plt.subplots()
-    sns.barplot(
-        x=urgency_counts.index, 
-        y=[min(count, i) for count in urgency_counts.values], 
-        palette='Blues_d', 
-        ax=ax2
-    )
-    ax2.set_ylim(0, max_urgency + 5)
-    placeholder2.pyplot(fig2)
-    time.sleep(0.2)
+st.subheader("⚠️ Maintenance Urgency Levels")
+fig2, ax2 = plt.subplots()
+sns.countplot(data=data, x='Maintenance Urgency', palette='Blues_d', ax=ax2)
+st.pyplot(fig2)
 
 # Maintenance due soon
 st.subheader("🛠️ Maintenance Due in Next 60 Days")
@@ -148,7 +118,7 @@ if st.button("Request Maintenance"):
     if eid_input in data['id'].values:
         request_maintenance(conn, eid_input)
         st.success(f"✅ Maintenance requested for {eid_input}")
-        time.sleep(2)
+        time.sleep(5)
         st.rerun()
     else:
         st.error("❌ Equipment ID not found!")
@@ -160,7 +130,7 @@ if st.button("Delete Equipment"):
     if eid_delete in data['id'].values:
         delete_equipment(conn, eid_delete)
         st.success(f"🗑️ Equipment {eid_delete} deleted.")
-        time.sleep(2)
+        time.sleep(5)
         st.rerun()
     else:
         st.error("❌ Equipment ID not found!")
@@ -168,11 +138,7 @@ if st.button("Delete Equipment"):
 # Add equipment
 st.subheader("➕ Add New Equipment")
 eid_add = st.text_input("Enter new Equipment ID:", key="add")
-etype_add = st.selectbox("Select Equipment Type:", [
-    'X-ray', 'MRI', 'CT Scan', 'Ultrasound', 'Ventilator',
-    'ECG machine', 'EEG machine', 'EMG machine', 
-    'Blood Gas Analyzers', 'Defibrillators', 'Hospital Beds'
-])
+etype_add = st.selectbox("Select Equipment Type:", ['X-ray', 'MRI', 'CT Scan', 'Ultrasound', 'Ventilator', 'ECG machine', 'EEG machine', 'EMG machine', 'Blood Gas Analyzers', 'Defibrillators', 'Hospital Beds'])
 status_add = st.selectbox("Select Status:", ['Operational', 'Under Maintenance', 'Faulty'])
 if st.button("Add Equipment"):
     if eid_add in data['id'].values:
@@ -180,5 +146,24 @@ if st.button("Add Equipment"):
     else:
         add_equipment(conn, eid_add, etype_add, status_add)
         st.success(f"✅ Equipment {eid_add} added.")
-        time.sleep(2)
+        time.sleep(5)
         st.rerun()
+
+# Mark equipment as operational
+st.subheader("✅ Mark Equipment as Operational")
+# Only show IDs with 'Under Maintenance' status
+maintenance_items = data[data['status'] == 'Under Maintenance']
+eid_operational = st.selectbox("Select Equipment ID to mark as operational:", maintenance_items['id'].values)
+if st.button("Mark as Operational"):
+    if eid_operational:
+        conn.execute("""
+            UPDATE equipment
+            SET status='Operational'
+            WHERE id=?
+        """, (eid_operational,))
+        conn.commit()
+        st.success(f"✅ Equipment {eid_operational} marked as Operational.")
+        time.sleep(5)
+        st.rerun()
+    else:
+        st.error("❌ No equipment selected!")
